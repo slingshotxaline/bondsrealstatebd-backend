@@ -15,16 +15,15 @@ app.use(helmet());
 app.use(compression());
 
 // CORS
-app.use(
-  cors({
-    origin: [
-      'http://localhost:3000',
-      'https://www.bondsrealestatebd.com',
-      'https://bondsrealestatebd.com',
-    ],
-    credentials: true,
-  })
-);
+const corsOptions = {
+  origin: [
+    'http://localhost:3000',
+    'https://www.bondsrealestatebd.com',
+    'https://bondsrealestatebd.com',
+  ],
+  credentials: true,
+};
+app.use(cors(corsOptions));
 
 app.options(/.*/, cors(corsOptions));
 
