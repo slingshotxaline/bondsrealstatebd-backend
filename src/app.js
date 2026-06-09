@@ -18,13 +18,15 @@ app.use(compression());
 app.use(
   cors({
     origin: [
-      process.env.CLIENT_URL,
-      process.env.CLIENT_URL_PROD,
+      'http://localhost:3000',
+      'https://www.bondsrealestatebd.com',
       'https://bondsrealestatebd.com',
     ],
     credentials: true,
   })
 );
+
+app.options('*', cors());
 
 // Rate limiting
 const limiter = rateLimit({
