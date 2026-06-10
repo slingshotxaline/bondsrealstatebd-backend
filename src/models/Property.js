@@ -14,7 +14,7 @@ const AMENITIES = [
 
 const PROPERTY_CATEGORIES = [
   'Apartment', 'Offices', 'House', 'Land', 'Residential', 'Other', 'Building',
-  'Restaurant', 'Factory / Mill', 'Commercial', 'Agricultural', 'Warehouse',
+  'Restaurant', 'Factory / Mill', 'Commercial',  'Warehouse',
   'Shop', 'Garage', 'Hotel', 'Flat',
 ];
 
@@ -60,6 +60,12 @@ const propertySchema = new mongoose.Schema(
       required: [true, 'Property title is required'],
       trim: true,
       maxlength: [200, 'Title cannot exceed 200 characters'],
+    },
+
+    slug: {
+      type: String,
+      unique: true,
+      index: true,
     },
     description: {
       type: String,

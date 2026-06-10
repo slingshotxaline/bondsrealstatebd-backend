@@ -15,6 +15,11 @@ const {
 
 const { adminGetInquiries, updateInquiry } = require('../controllers/inquiryController');
 
+const {
+  getContacts, getContact, updateContact,
+  deleteContact, getContactStats,
+} = require('../controllers/contactController');
+
 const { upload } = require('../config/cloudinary');
 
 const validate = require('../middleware/validate');
@@ -51,5 +56,12 @@ router.delete('/admins/:id', ...superAuth, deleteAdmin);
 // ── Inquiry management ───────────────────────────────────────────────────────
 router.get('/inquiries', ...adminAuth, adminGetInquiries);
 router.patch('/inquiries/:id', ...adminAuth, updateInquiry);
+
+// ── Contact messages ──────────────────────────────────────────────────────────
+router.get('/contacts/stats', ...adminAuth, getContactStats);
+router.get('/contacts',       ...adminAuth, getContacts);
+router.get('/contacts/:id',   ...adminAuth, getContact);
+router.patch('/contacts/:id', ...adminAuth, updateContact);
+router.delete('/contacts/:id',...adminAuth, deleteContact);
 
 module.exports = router;

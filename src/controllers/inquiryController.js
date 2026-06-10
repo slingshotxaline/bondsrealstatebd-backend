@@ -11,21 +11,35 @@ exports.submitInquiry = asyncHandler(async (req, res) => {
 
   const inquiry = await Inquiry.create({
     property: property._id,
-    user: req.user?._id || null,
+    user:     req.user?._id || null,
     ...req.body,
   });
 
-  // Notify admin (property owner / approver) - simplified: notify property submitter
+  // ── Notify the property owner (if user-submitted property) ───────────
   if (property.submittedBy) {
     await createNotification({
-      recipient: property.submittedBy,
-      type: 'INQUIRY_RECEIVED',
-      title: 'New Inquiry',
-      message: `New ${inquiry.inquiryType} inquiry on "${property.title}" from ${inquiry.name}`,
+      recipient:      property.submittedBy,
+      type:           'INQUIRY_RECEIVED',
+      title:          'New Inquiry on Your Property',
+      message:        `${inquiry.name} sent a ${inquiry.inquiryType} inquiry on "${property.title}".`,
       relatedProperty: property._id,
-      relatedInquiry: inquiry._id,
+      relatedInquiry:  inquiry._id,
     });
   }
+
+  // ── Notify all admins ────────────────────────────────────────────────
+  const User = require('../models/User');
+  const admins = await User.find({ role: { $in: ['admin', 'superadmin'] } }).select('_id').lean();
+  await Promise.all(admins.map(admin =>
+    createNotification({
+      recipient:       admin._id,
+      type:            'INQUIRY_RECEIVED',
+      title:           'New Property Inquiry',
+      message:         `${inquiry.name} sent a ${inquiry.inquiryType} inquiry on "${property.title}".`,
+      relatedProperty: property._id,
+      relatedInquiry:  inquiry._id,
+    })
+  ));
 
   sendSuccess(res, 201, 'Inquiry submitted', { inquiry });
 });
