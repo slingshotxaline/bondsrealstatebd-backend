@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const {
-  getProperties, getProperty,
+  getProperties, getProperty, getPropertyBySlug,
   createProperty, getMyProperties,
   updateProperty, deleteProperty,
 } = require('../controllers/propertyController');
@@ -22,6 +22,7 @@ const uploadFields = upload.fields([
 router.get('/', propertyQueryValidator, validate, getProperties);
 router.get('/my', protect, getMyProperties);
 router.get('/:id', optionalProtect, getProperty);
+router.get('/slug/:slug', optionalProtect, getPropertyBySlug);
 
 // Inquiry (optional auth)
 router.post('/:id/inquiries', optionalProtect, inquiryValidator, validate, submitInquiry);

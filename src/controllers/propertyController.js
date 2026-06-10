@@ -10,6 +10,55 @@ const { createNotification } = require("../utils/notification");
 const { sendEmail, emailTemplates } = require("../utils/email");
 const { deleteFile, deleteFiles } = require("../config/cloudinary");
 
+const notifyAdmins = async ({
+  type,
+  title,
+  message,
+  relatedProperty = null,
+  relatedInquiry = null,
+}) => {
+  try {
+    const admins = await User.find({ role: { $in: ["admin", "superadmin"] } })
+      .select("_id")
+      .lean();
+    await Promise.all(
+      admins.map((admin) =>
+        createNotification({
+          recipient: admin._id,
+          type,
+          title,
+          message,
+          relatedProperty,
+          relatedInquiry,
+        })
+      )
+    );
+  } catch (err) {
+    console.error("Admin notification failed:", err.message);
+  }
+};
+
+const generateSlug = async (title, id = null) => {
+  // "Spacious 3BHK Apartment in Gulshan" → "spacious-3bhk-apartment-in-gulshan"
+  const base = title
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "") // remove special chars
+    .replace(/[\s_]+/g, "-") // spaces to hyphens
+    .replace(/-+/g, "-") // collapse multiple hyphens
+    .slice(0, 80); // max 80 chars
+
+  // Check for collision, append short id suffix if needed
+  const exists = await Property.findOne({
+    slug: base,
+    ...(id && { _id: { $ne: id } }),
+  });
+  if (!exists) return base;
+
+  // Collision → append 6-char id suffix
+  return `${base}-${Date.now().toString(36)}`;
+};
+
 // ── Query builders ────────────────────────────────────────────────────────────
 const buildFilter = (query, extraFilters = {}) => {
   const filter = { ...extraFilters };
@@ -80,7 +129,7 @@ exports.getProperties = asyncHandler(async (req, res) => {
 // Owner: can see their own any-status property
 // Admin: can see any property regardless of status
 exports.getProperty = asyncHandler(async (req, res) => {
-  const isAdmin = req.user && ['admin', 'superadmin'].includes(req.user.role);
+  const isAdmin = req.user && ["admin", "superadmin"].includes(req.user.role);
   const isOwner = req.user?._id;
 
   let property;
@@ -90,11 +139,10 @@ exports.getProperty = asyncHandler(async (req, res) => {
     property = await Property.findByIdAndUpdate(
       req.params.id,
       { $inc: { views: 1 } },
-      { returnDocument: 'after' }
+      { returnDocument: "after" }
     )
-    .populate('submittedBy', 'name email phone')
-    .lean();
-
+      .populate("submittedBy", "name email phone")
+      .lean();
   } else if (isOwner) {
     // Logged-in user sees their own property at any status
     // but only Approved ones from others
@@ -102,25 +150,24 @@ exports.getProperty = asyncHandler(async (req, res) => {
       {
         _id: req.params.id,
         $or: [
-          { status: 'Approved', isActive: true },
+          { status: "Approved", isActive: true },
           { submittedBy: req.user._id },
         ],
       },
       { $inc: { views: 1 } },
-      { returnDocument: 'after' }
+      { returnDocument: "after" }
     ).lean();
-
   } else {
     // Guest — approved only
     property = await Property.findOneAndUpdate(
-      { _id: req.params.id, status: 'Approved', isActive: true },
+      { _id: req.params.id, status: "Approved", isActive: true },
       { $inc: { views: 1 } },
-      { returnDocument: 'after' }
+      { returnDocument: "after" }
     ).lean();
   }
 
-  if (!property) throw new AppError('Property not found', 404);
-  sendSuccess(res, 200, 'Property fetched', { property });
+  if (!property) throw new AppError("Property not found", 404);
+  sendSuccess(res, 200, "Property fetched", { property });
 });
 
 // ─── User ─────────────────────────────────────────────────────────────────────
@@ -145,15 +192,27 @@ exports.createProperty = asyncHandler(async (req, res) => {
 
   const isAdmin = ["admin", "superadmin"].includes(req.user.role);
 
+  const slug = await generateSlug(req.body.title);
+
   const property = await Property.create({
     ...req.body,
     amenities,
     thumbnail,
     photos,
+    slug,
     submittedBy: req.user._id,
     status: isAdmin ? "Approved" : "Pending",
     approvedBy: isAdmin ? req.user._id : undefined,
   });
+
+  if (!isAdmin) {
+    await notifyAdmins({
+      type: "PROPERTY_SUBMITTED",
+      title: "New Property Submitted",
+      message: `${req.user.name} submitted "${property.title}" for review.`,
+      relatedProperty: property._id,
+    });
+  }
 
   sendSuccess(
     res,
@@ -201,6 +260,10 @@ exports.updateProperty = asyncHandler(async (req, res) => {
   }
 
   const updates = { ...req.body };
+
+  if (req.body.title && req.body.title !== property.title) {
+    updates.slug = await generateSlug(req.body.title, property._id);
+  }
 
   // ── New thumbnail uploaded → delete old from Cloudinary, use new ──────────
   if (req.files?.thumbnail?.[0]) {
@@ -373,4 +436,24 @@ exports.getStats = asyncHandler(async (req, res) => {
     Property.countDocuments(),
   ]);
   sendSuccess(res, 200, "Stats fetched", { total, statusStats, listingStats });
+});
+
+exports.getPropertyBySlug = asyncHandler(async (req, res) => {
+  const isAdmin = req.user && ["admin", "superadmin"].includes(req.user.role);
+
+  const filter = { slug: req.params.slug };
+  // Public only sees Approved; admin sees all
+  if (!isAdmin) {
+    filter.status = "Approved";
+    filter.isActive = true;
+  }
+
+  const property = await Property.findOneAndUpdate(
+    filter,
+    { $inc: { views: 1 } },
+    { returnDocument: "after" }
+  ).lean();
+
+  if (!property) throw new AppError("Property not found", 404);
+  sendSuccess(res, 200, "Property fetched", { property });
 });

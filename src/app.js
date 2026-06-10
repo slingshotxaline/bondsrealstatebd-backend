@@ -27,18 +27,22 @@ app.use(cors(corsOptions));
 
 app.options(/.*/, cors(corsOptions));
 
+const isDev = process.env.NODE_ENV !== 'production';
+
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 min
-  max: 100,
+  windowMs: 15 * 60 * 1000,       // 15 min window
+  max: isDev ? 2000 : 300,        // dev: 2000 reqs | prod: 300 per IP
   message: { success: false, message: 'Too many requests. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
+  // In dev, skip rate limiting entirely for authenticated requests
+  skip: (req) => isDev && !!req.headers.authorization,
 });
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: isDev ? 100 : 20,          // dev: relaxed | prod: 20 login attempts per 15min
   message: { success: false, message: 'Too many auth attempts. Try again in 15 minutes.' },
 });
 
@@ -68,6 +72,8 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/properties', require('./routes/properties'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/user', require('./routes/user'));
+app.use('/api/contact', require('./routes/contact'));
+
 
 // ── 404 handler ───────────────────────────────────────────────────────────────
 app.use((req, res) => {
