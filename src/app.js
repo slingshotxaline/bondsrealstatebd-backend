@@ -73,6 +73,8 @@ app.use('/api/properties', require('./routes/properties'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/user', require('./routes/user'));
 app.use('/api/contact', require('./routes/contact'));
+app.use('/api/projects', require('./routes/projects'));
+app.use('/api/team', require('./routes/team'));
 
 
 // ── 404 handler ───────────────────────────────────────────────────────────────
