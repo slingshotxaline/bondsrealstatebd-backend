@@ -5,14 +5,26 @@ const morgan = require('morgan');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
-
 const errorHandler = require('./middleware/errorHandler');
-
 const app = express();
+
+const session  = require('express-session');
+const passport = require('./config/passport');
 
 // ── Security & performance ────────────────────────────────────────────────────
 app.use(helmet());
 app.use(compression());
+
+// Session (required by passport even in stateless JWT mode)
+app.use(session({
+  secret:            process.env.SESSION_SECRET || 'bonds-session-secret',
+  resave:            false,
+  saveUninitialized: false,
+  cookie: { secure: process.env.NODE_ENV === 'production', maxAge: 5 * 60 * 1000 },
+}));
+
+app.use(passport.initialize());
+// app.use(passport.session());
 
 // CORS
 const corsOptions = {
