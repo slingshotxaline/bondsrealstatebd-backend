@@ -457,3 +457,11 @@ exports.getPropertyBySlug = asyncHandler(async (req, res) => {
   if (!property) throw new AppError("Property not found", 404);
   sendSuccess(res, 200, "Property fetched", { property });
 });
+
+
+// GET /api/properties/meta — distinct cities for filter dropdown
+exports.getPropertyMeta = asyncHandler(async (req, res) => {
+  const cities = await Property.distinct('city', { status: 'Approved', isActive: true });
+  const areas  = await Property.distinct('area', { status: 'Approved', isActive: true });
+  sendSuccess(res, 200, 'Meta fetched', { cities: cities.sort(), areas: areas.sort() });
+});
